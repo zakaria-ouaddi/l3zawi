@@ -1,0 +1,21 @@
+string group_name
+
+---
+
+uint8 SUCCESS=0
+uint8 ERROR=1
+uint8 GROUP_NOT_FOUND_ERROR=2
+uint8 BUSY=3
+
+sensor_msgs/JointState joint_state
+
+# Joints that are connected to an action server
+string[] controlled_joints
+
+string[] links
+
+string[] child_groups
+
+geometry_msgs/PoseStamped root_link_pose
+
+uint8 error_codes

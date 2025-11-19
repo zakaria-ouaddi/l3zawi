@@ -1,0 +1,11 @@
+.venv
+__pycache__
+.idea
+.hypothesis
+_build
+*.egg-info
+build
+resources/procthor_environments
+examples/tmp
+test/file::memory:
+resources/fbx

@@ -1,0 +1,21 @@
+<launch>
+  <remap from="/whole_body_controller/state" to="/tests/state"/>
+  <include file="$(find iai_pr2_description)/launch/upload_pr2_with_odom_joints.launch" />
+
+  <rosparam command="load" file="$(find iai_pr2_sim)/config/ros_control_sim.yaml" />
+
+  <remap from="/joint_trajectory_controller" to="/whole_body_controller" />
+
+  <node pkg="ros_control_boilerplate" type="sim_hw_main" name="simulator" 
+        output="screen"/>
+
+  <node pkg="controller_manager" type="spawner" name="spawner" output="screen"
+        args="joint_state_controller joint_trajectory_controller --shutdown-timeout 0.5" />
+
+  <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher" />
+
+  <node pkg="tf2_ros" type="buffer_server" name="tf2_buffer_server" />
+
+  <node pkg="tf2_ros" type="static_transform_publisher" name="fake_localization" output="screen" args="0 0 0 0 0 0 map odom" />
+
+</launch>

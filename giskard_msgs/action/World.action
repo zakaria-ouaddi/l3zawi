@@ -1,0 +1,51 @@
+# goal
+
+# operations:
+# Some constants to fill the field operation
+uint8 UNDEFINED=0
+
+# Adds 'body' to world at 'pose' and attaches it to 'parent_link' of 'parent_link_group'. 
+# Adds group of name 'group_name'.
+uint8 ADD=1
+
+# If 'group_name' exists: removes the group from whatever it is attached to and attaches it to 'parent_link_group'/'parent_link'.
+# This operation with 'parent_link_group' and 'parent_link' left empty can be interpreted as detach.
+uint8 UPDATE_PARENT_LINK=10
+
+# Overwrite the pose of the root_link of 'group_name'
+uint8 UPDATE_POSE=11
+
+# Remove group named 'group_name' from the world.
+# This will remove child groups as well!
+uint8 REMOVE=2
+
+# Clears the world and reloads the robot cached from the parameter server.
+uint8 REMOVE_ALL=4
+
+uint8 REGISTER_GROUP=5
+
+# Type of operation that shall be performed on the world representation
+uint8 operation
+#-------------------------
+
+# Will reject service calls with 'error_code' = 'BUSY', if Giskard is planning or processing another update.
+# You can set this timeout to wait that amount of seconds for Giskard to be ready.
+float64 timeout
+
+string group_name
+
+giskard_msgs/WorldBody body
+
+giskard_msgs/LinkName parent_link
+
+# Pose where new bodies will be spawned. Pose of root link of the world body relative to parent_link
+geometry_msgs/PoseStamped pose
+
+---
+# result
+
+GiskardError error
+
+---
+# feedback
+

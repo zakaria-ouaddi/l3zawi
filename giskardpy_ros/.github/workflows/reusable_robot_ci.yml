@@ -1,0 +1,289 @@
+name: Reusable Robot CI
+defaults:
+  run:
+    shell: bash -ieo pipefail {0}
+on:
+  workflow_call:
+    inputs:
+      robot:
+        description: one of [pr2, hsr, tiago, donbot]
+        required: true
+        type: string
+      test1:
+        description: that that will be run, e.g. test/test_integration_hsr.py::TestJointGoals
+        required: true
+        type: string
+      test2:
+        required: false
+        type: string
+      test3:
+        required: false
+        type: string
+      test4:
+        required: false
+        type: string
+      test5:
+        required: false
+        type: string
+      test6:
+        required: false
+        type: string
+      test7:
+        required: false
+        type: string
+      test8:
+        required: false
+        type: string
+      test9:
+        required: false
+        type: string
+      test10:
+        required: false
+        type: string
+      is_trigger:
+        description: 'Is trigger from giskardpy'
+        required: false
+        type: boolean
+        default: false
+      pr_id:
+        description: 'Is trigger from giskardpy'
+        required: false
+        type: string
+        default: ''
+jobs:
+  # GitHub Repository-Owners can have uppercase letters.
+  # Container Registry URLs need to be lowercase.
+  # There is no easy way to get it to lowercase (that i found)
+  to-lowercase:
+    runs-on: ubuntu-latest
+    outputs:
+      repo_lowercase: ${{ steps.lowercase.outputs.repository }}
+    steps:
+      - id: lowercase
+        run: |
+          echo "repository=${GITHUB_REPOSITORY@L}" >> $GITHUB_OUTPUT
+  test_standalone:
+    needs: to-lowercase
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        qp_solver: [qpSWIFT]
+        container:
+          - jazzy
+    container: # Login and start specified container image. Ubuntu20.04 isn't supported on GitHub-Workflow as of 04.2025
+      image: ghcr.io/${{ needs.to-lowercase.outputs.repo_lowercase }}:${{ matrix.container }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      QP_SOLVER: ${{ matrix.qp_solver }}
+      HOME: /root/
+    steps:
+      #install giskardpy and look for possible PR to sync with
+      - name: Find Corresponding PR in giskardpy
+        # searches for pull-request in giskardpy match the pull-request that triggered the workflow.
+        # Uses the pr-url, pr-number or pr-title to search the open pr's on giskardpy to find a description,
+        # which contains one of them.
+        if: github.event_name == 'pull_request'
+        run: |
+          REPO="${{ github.repository_owner }}/giskardpy"
+          PR_TITLE="${{ github.event.pull_request.title }}"
+
+          echo "Searching for PR related to $PR_TITLE in $REPO"
+
+          # Find PR by matching title or linked issues
+          PR_JSON=$(gh pr list --repo "$REPO" --state open \
+            --json number,title,url,mergeable | jq -r \
+            ".[] | select(.title | contains(\"${PR_TITLE}\")) | @base64")
+
+          if [[ -n "$PR_JSON" ]]; then
+            PR_INFO=$(echo "$PR_JSON" | base64 --decode)
+            PR_URL=$(echo "$PR_INFO" | jq -r '.url')
+            PR_ID=$(echo "$PR_INFO" | jq -r '.number')
+            PR_MERGEABLE=$(echo "$PR_INFO" | jq -r '.mergeable')
+
+            echo "Found related PR in second repo: $PR_URL"
+            echo "pr_found=true" >> $GITHUB_ENV
+            echo "pr_id=$PR_ID" >> $GITHUB_ENV
+            echo "pr_mergeable=$PR_MERGEABLE" >> $GITHUB_ENV
+          else
+            echo "No matching PR found in second repo."
+            echo "pr_found=false" >> $GITHUB_ENV
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Check if triggered from giskardpy
+        if: inputs.is_trigger
+        run: |
+            echo "pr_found=true" >> $GITHUB_ENV
+            echo "pr_id=${{ inputs.pr_id }}" >> $GITHUB_ENV
+            echo "pr_mergeable=MERGEABLE" >> $GITHUB_ENV
+      - name: Checkout giskardpy PR Branch
+        # when a matching pr is found and merge-able, clone the repo and merge the branches of the pr.
+        if: env.pr_found == 'true' && env.pr_mergeable == 'MERGEABLE'
+        run: |
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "GitHub Actions"
+          
+          git clone https://github.com/${{ github.repository_owner }}/giskardpy.git
+          cd giskardpy
+          
+          gh pr checkout --repo ${{ github.repository_owner }}/giskardpy ${{ env.pr_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - uses: actions/checkout@v3
+        if: (inputs.is_trigger == false && github.event_name == 'push') || env.pr_found == 'false' || env.pr_mergeable != 'MERGEABLE'
+        # fallback repo and branch, if event is push or no merge-able pr is found
+        with:
+          path: 'giskardpy'
+          repository: ${{ github.repository_owner }}/giskardpy
+          ref: semantic_world_integration
+      - name: install pip dependencies giskardpy
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install -r giskardpy/requirements.txt
+          cd giskardpy
+          pip3 install -e .
+      - name: install pip dependencies semantic-digital-twin
+        run: |
+          git clone https://github.com/cram2/semantic_digital_twin.git
+          cd semantic_digital_twin
+          pip3 install -r requirements.txt
+          pip3 install -e .
+      #pull github deps ================================================================================================
+      - name: Create workspace I
+        run: |
+          mkdir -p giskard_ws/src && cd giskard_ws
+          colcon build
+      - uses: actions/checkout@v3
+        with:
+          path: 'giskard_ws/src/giskardpy_ros'
+      - name: Checkout iai_maps
+        uses: actions/checkout@v3
+        with:
+          path: 'giskard_ws/src/iai_maps'
+          repository: code-iai/iai_maps
+          ref: ros-jazzy
+      - name: ignore some packages in iai_maps
+        run: |
+          cd giskard_ws
+          touch src/iai_maps/chemistry_laboratory/AMENT_IGNORE
+          touch src/iai_maps/iai_dlr_cutting_demo/AMENT_IGNORE
+          touch src/iai_maps/iai_kitchen_defs/AMENT_IGNORE
+          touch src/iai_maps/iai_refills_lab/AMENT_IGNORE
+          touch src/iai_maps/iai_semantic_maps/AMENT_IGNORE
+          touch src/iai_maps/iai_shelves/AMENT_IGNORE
+      # install robots -------------------------------------------------------------------------------------------------
+      - if: ${{ inputs.robot == 'hsr' }}
+        name: Checkout hsr_description
+        uses: actions/checkout@v3
+        with:
+          path: 'giskard_ws/src/hsr_description'
+          repository: code-iai/hsr_description
+          ref: ros2-jazzy
+      # - if: ${{ inputs.robot == 'hsr' }}
+      #   name: Checkout hsr_meshes
+      #   uses: actions/checkout@v3
+      #   with:
+      #     path: 'giskard_ws/src/hsr_meshes'
+      #     repository: ToyotaResearchInstitute/hsr_meshes
+      #     ref: master
+      - if: ${{ inputs.robot == 'donbot' }}
+        name: Checkout iai_robots
+        uses: actions/checkout@v3
+        with:
+          path: 'giskard_ws/src/iai_robots'
+          repository: code-iai/iai_robots
+          ref: master
+      - if: ${{ inputs.robot == 'donbot' }}
+        name: Checkout iai_robot_peripherals
+        uses: actions/checkout@v3
+        with:
+          path: 'ros_ws/src/iai_robot_peripherals'
+          repository: code-iai/iai_robot_peripherals
+          ref: main
+      - if: ${{ inputs.robot == 'pr2' }}
+        name: Checkout iai_pr2
+        uses: actions/checkout@v3
+        with:
+          path: 'giskard_ws/src/iai_pr2'
+          repository: code-iai/iai_pr2
+          ref: ros-jazzy-main
+#      - if: ${{ inputs.robot == 'pr2' }}
+#        name: ignore some packages in iai_pr2
+#        run: |
+#          cd giskard_ws
+#          touch src/iai_pr2/iai_pr2_sim/CATKIN_IGNORE
+#          touch src/iai_pr2/iai_pr2_donbot/CATKIN_IGNORE
+      - if: ${{ inputs.robot == 'tiago' }}
+        name: Checkout iai_tiago_description
+        uses: actions/checkout@v3
+        with:
+          path: 'giskard_ws/src/iai_tiago_description'
+          repository: code-iai/iai_tiago_description
+          ref: ros2-main
+      # build workspace ------------------------------------------------------------------------------------------------
+      - name: Create workspace II
+        run: |
+          cd giskard_ws
+          vcs import src < src/giskardpy_ros/jazzy.repos 
+          rosdep update --rosdistro=${{ matrix.container }}
+          sudo apt-get update
+          rosdep install --from-paths ./ -i -y --rosdistro ${ROS_DISTRO}
+          colcon build
+          source install/setup.bash
+          echo 'source $GITHUB_WORKSPACE/giskard_ws/install/setup.bash' >> ~/.bashrc
+      #tests ===========================================================================================================
+      - if: ${{ (always()) && (runner.debug == '1') }}
+#      - if: ${{ (always()) }}
+        name: Setup upterm session
+        uses: lhotari/action-upterm@v1
+      - name: run ${{ inputs.test1 }}
+        run: |
+          cd /__w/giskardpy_ros/giskardpy_ros/giskard_ws/src/giskardpy_ros/test
+          python3 -m pytest -s ${{ inputs.test1 }}
+      - if: ${{ inputs.test2 != '' }}
+        name: run ${{ inputs.test2 }}
+        run: |
+          cd /__w/giskardpy_ros/giskardpy_ros/giskard_ws/src/giskardpy_ros/test
+          python3 -m pytest -s ${{ inputs.test2 }}
+      - if: ${{ inputs.test3 != '' }}
+        name: run ${{ inputs.test3 }}
+        run: |
+          cd /__w/giskardpy_ros/giskardpy_ros/giskard_ws/src/giskardpy_ros/test
+          python3 -m pytest -s ${{ inputs.test3 }}
+      - if: ${{ inputs.test4 != '' }}
+        name: run ${{ inputs.test4 }}
+        run: |
+          cd /__w/giskardpy_ros/giskardpy_ros/giskard_ws/src/giskardpy_ros/test
+          python3 -m pytest -s ${{ inputs.test4 }}
+      - if: ${{ inputs.test5 != '' }}
+        name: run ${{ inputs.test5 }}
+        run: |
+          cd /__w/giskardpy_ros/giskardpy_ros/giskard_ws/src/giskardpy_ros/test
+          python3 -m pytest -s ${{ inputs.test5 }}
+      - if: ${{ inputs.test6 != '' }}
+        name: run ${{ inputs.test6 }}
+        run: |
+          cd /__w/giskardpy_ros/giskardpy_ros/giskard_ws/src/giskardpy_ros/test
+          python3 -m pytest -s ${{ inputs.test6 }}
+      - if: ${{ inputs.test7 != '' }}
+        name: run ${{ inputs.test7 }}
+        run: |
+          cd /__w/giskardpy_ros/giskardpy_ros/giskard_ws/src/giskardpy_ros/test
+          python3 -m pytest -s ${{ inputs.test7 }}
+      - if: ${{ inputs.test8 != '' }}
+        name: run ${{ inputs.test8 }}
+        run: |
+          cd /__w/giskardpy_ros/giskardpy_ros/giskard_ws/src/giskardpy_ros/test
+          python3 -m pytest -s ${{ inputs.test8 }}
+      - if: ${{ inputs.test9 != '' }}
+        name: run ${{ inputs.test9 }}
+        run: |
+          cd /__w/giskardpy_ros/giskardpy_ros/giskard_ws/src/giskardpy_ros/test
+          python3 -m pytest -s ${{ inputs.test9 }}
+      - if: ${{ inputs.test10 != '' }}
+        name: run ${{ inputs.test10 }}
+        run: |
+          cd /__w/giskardpy_ros/giskardpy_ros/giskard_ws/src/giskardpy_ros/test
+          python3 -m pytest -s ${{ inputs.test10 }}

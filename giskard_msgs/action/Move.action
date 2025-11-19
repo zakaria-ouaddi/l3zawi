@@ -1,0 +1,33 @@
+# goal
+
+# definitions of possible values to use as type
+int64 UNDEFINED=0
+int64 EXECUTE=1 # closed loop -> execute in real time; open loop -> plan and execute
+int64 PROJECTION=2 # plan only
+
+# use one of the above constants to indicate the goal type
+int64 type
+
+# describe a motion with a list of motion goals and monitors
+giskard_msgs/MotionStatechartNode[] nodes
+
+---
+# result
+
+GiskardError error
+
+# planned trajectory
+trajectory_msgs/JointTrajectory trajectory
+
+# final execution state
+ExecutionState execution_state
+---
+# feedback
+
+# definitions of possible action phases
+int64 UNDEFINED=0
+int64 PLANNING=2
+int64 EXECUTION=3
+int64 IDLE=1
+
+int64 state

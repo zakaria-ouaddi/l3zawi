@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[tool.pyrefly]
+project-includes = ["**/*"]
+project-excludes = ["**/*venv/**/*"]
+
+[project]
+name = "semantic_world"
+authors = [
+    { name="Tom Schierenbeck", email="tom_sch@uni-bremen.de" },
+
+]
+description = "A world model that unifies kinematic information and semantic meaning for robotic world representations."
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+]
+keywords=["robotics"]
+dynamic = ["version", "dependencies"]
+license = { text = "LGPL-3.0-only" }
+
+[project.urls]
+"Source" = 'https://github.com/cram2/semantic_world'
+"Bug Tracker" = 'https://github.com/cram2/semantic_world/issues'
+
+[tool.setuptools.packages.find]
+where = ["src"]  # list of folders that contain the packages (["."] by default)
+include = ["semantic_world*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "semantic_world.__version__"}
+dependencies = {file = "requirements.txt"}
+
+[project.optional-dependencies]
+gui = [
+    "ripple_down_rules[gui]",
+]

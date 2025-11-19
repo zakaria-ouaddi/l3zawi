@@ -1,0 +1,38 @@
+rustworkx
+numpy
+trimesh>=4.8.0
+typing_extensions
+urdf-parser-py
+matplotlib
+casadi~=3.7.0
+hypothesis
+pytest
+scipy
+ormatic>=1.1.16
+sqlacodegen
+ripple_down_rules>=0.6.51
+pytest-order
+sqlalchemy
+embreex # Hardware acceleration for trimesh raycasting
+rtree # For spatial indexing in trimesh
+random_events
+plotly
+rtree
+daqp
+pathlib
+probabilistic_model
+python-fcl
+manifold3d
+entity_query_language>=2.0.5
+polytope
+ortools
+fbxloader
+coacd
+pymysql
+pyglet == 1.5.31
+pycollada
+owlready2>=0.45
+pin==2.7.0
+pint
+python-box
+pytransform3d

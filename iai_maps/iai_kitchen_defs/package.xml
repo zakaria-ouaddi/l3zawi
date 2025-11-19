@@ -1,0 +1,23 @@
+<package>
+  <name>iai_kitchen_defs</name>
+  <version>1.0.0</version>
+  <description>URDF description of the kitchen laboratory of the IAI in Bremen</description>
+
+  <maintainer email="aniedz@cs.uni-bremen.de">Arthur Niedzwiecki</maintainer>
+
+  <license>LGPL</license>
+
+  <author>Jan Winkler</author>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <build_depend>xacro</build_depend>
+  <run_depend>xacro</run_depend>
+
+    <export>
+    <!-- Other tools can request additional information be placed here -->
+    <build_type>ament_cmake</build_type>
+
+  </export>
+
+</package>
